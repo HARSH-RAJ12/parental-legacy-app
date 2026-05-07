@@ -1,118 +1,151 @@
 import React, { useState, useEffect } from 'react';
 
+// Exact Min/Max limits for individual parent values as per your screenshots
+const BASE_FACTORS = [
+  { name: "Genetic Inheritance", icon: "🧬", min: 9.0, max: 11.5 },
+  { name: "Constitutional Vitality", icon: "⚡", min: 8.0, max: 10.0 },
+  { name: "Mental Patterns", icon: "🧠", min: 6.0, max: 7.5 },
+  { name: "Intellectual Capacity", icon: "🎓", min: 6.0, max: 7.5 },
+  { name: "Emotional Foundation", icon: "❤️", min: 7.0, max: 8.5 },
+  { name: "Spiritual Lineage", icon: "✨", min: 5.0, max: 6.5 },
+  { name: "Soul Connections", icon: "🤝", min: 5.0, max: 6.5 },
+];
+
 function App() {
-  const [selectedDate, setSelectedDate] = useState(new Date().getDate());
-  const [data, setData] = useState(null);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [day, setDay] = useState(new Date().getDate());
+  const [displayData, setDisplayData] = useState([]);
+  const [isMotherDominant, setIsMotherDominant] = useState(true);
 
   useEffect(() => {
-    // Relative path handles both Local Proxy and Vercel Deployment
-    fetch(`/api/parental-legacy?day=${selectedDate}`)
-      .then((res) => res.json())
-      .then((json) => {
-        setData(json);
-        setIsInitialLoading(false);
-      })
-      .catch((err) => {
-        console.error("Backend connection error:", err);
-        setIsInitialLoading(false);
-      });
-  }, [selectedDate]);
+    calculateLegacy(day);
+  }, [day]);
 
-  if (isInitialLoading) {
-    return (
-      <div className="min-h-screen bg-[#080a10] text-white flex items-center justify-center font-black italic tracking-tighter text-xl sm:text-2xl">
-        INITIALIZING BIOMETRICS...
-      </div>
-    );
-  }
-  
-  if (!data) {
-    return (
-      <div className="min-h-screen bg-[#080a10] text-red-500 flex flex-col items-center justify-center font-bold p-4 text-center">
-        <span className="text-4xl mb-4">⚠️</span>
-        <p>SERVER OFFLINE</p>
-        <p className="text-xs opacity-50 mt-2">Please run 'node server.js' locally or check Vercel logs.</p>
-      </div>
-    );
-  }
+  const calculateLegacy = (selectedDay) => {
+    // Logic: Odd days -> Mother Dominant, Even days -> Father Dominant
+    const isMomsTurn = selectedDay % 2 !== 0; 
+    setIsMotherDominant(isMomsTurn);
 
-  const { factors, isMotherDominant } = data;
-  const mTotal = factors.reduce((a, b) => a + b.mother, 0);
-  const fTotal = factors.reduce((a, b) => a + b.father, 0);
+    // 1. Generate values strictly within [Min, Max] limits
+    let rawFactors = BASE_FACTORS.map(f => {
+      const range = f.max - f.min;
+      const seed = (selectedDay * 7) % 100; // Deterministic seed for reproducible values
+      const offset = seed / 100;
+      
+      // Calculate two distinct values inside the specific range
+      let val1 = f.min + (range * 0.25) + (offset * range * 0.2);
+      let val2 = f.min + (range * 0.55) + (offset * range * 0.2);
+
+      // Assign values based on dominance
+      let mother = isMomsTurn ? Math.max(val1, val2) : Math.min(val1, val2);
+      let father = isMomsTurn ? Math.min(val1, val2) : Math.max(val1, val2);
+
+      return { ...f, mother, father, total: mother + father };
+    });
+
+    // 2. Normalization: Ensuring Global Sum is exactly 100.000
+    const currentSum = rawFactors.reduce((acc, f) => acc + f.total, 0);
+    const multiplier = 100 / currentSum;
+
+    const finalFactors = rawFactors.map(f => {
+      const normalizedM = f.mother * multiplier;
+      const normalizedF = f.father * multiplier;
+      
+      return {
+        ...f,
+        mother: normalizedM,
+        father: normalizedF,
+        total: normalizedM + normalizedF
+      };
+    });
+
+    setDisplayData(finalFactors);
+  };
+
+  const totals = displayData.reduce(
+    (acc, f) => ({ m: acc.m + f.mother, f: acc.f + f.father, t: acc.t + f.total }),
+    { m: 0, f: 0, t: 0 }
+  );
 
   return (
-    <div className="min-h-screen bg-[#080a10] text-slate-300 p-2 sm:p-4 md:p-10 flex items-center justify-center">
-      <div className="w-full max-w-6xl bg-slate-900/60 p-4 sm:p-6 md:p-8 rounded-[1.5rem] md:rounded-[3rem] border border-white/5 shadow-2xl overflow-hidden">
+    <div className="min-h-screen bg-[#080a10] text-slate-300 p-4 md:p-10 flex items-center justify-center font-sans">
+      <div className="w-full max-w-6xl bg-[#11131a] p-6 md:p-10 rounded-[2.5rem] border border-white/5 shadow-2xl overflow-hidden">
         
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-6 mb-8">
+        <div className="flex flex-col sm:row justify-between items-center mb-12 gap-6">
           <div className="text-center sm:text-left">
-            <h1 className="text-2xl sm:text-3xl font-black italic text-white uppercase tracking-tighter">PARENTAL LEGACY</h1>
-            <p className="text-[9px] text-slate-500 font-black tracking-[0.3em] mt-1">REAL-TIME BIOMETRIC DATA</p>
+            <h1 className="text-3xl font-black text-white uppercase tracking-tighter">PARENTAL LEGACY</h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-500 ${isMotherDominant ? 'border-pink-500/50 bg-pink-500/10' : 'border-blue-500/50 bg-blue-500/10'}`}>
-              <span className="text-[9px] font-black uppercase text-slate-500 hidden xs:inline">Dominant:</span>
-              <span className={`text-xs font-bold uppercase ${isMotherDominant ? 'text-pink-400' : 'text-blue-400'}`}>
-                {isMotherDominant ? '♀ Mother' : '♂ Father'}
-              </span>
+          <div className="flex items-center gap-4">
+            <div className={`px-5 py-2 rounded-xl text-[11px] font-black border transition-all duration-300 ${
+              isMotherDominant ? 'border-pink-500/30 text-pink-400 bg-pink-500/5' : 'border-blue-500/30 text-blue-400 bg-blue-500/5'
+            }`}>
+              {isMotherDominant ? '♀ MOTHER DOMINANT' : '♂ FATHER DOMINANT'}
             </div>
-
-            <div className="bg-indigo-600 px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/20">
-              <span className="text-[10px] font-bold uppercase text-indigo-200">Day</span>
+            <div className="bg-indigo-600 px-4 py-2 rounded-xl flex items-center gap-3 shadow-lg">
+              <span className="text-xs font-bold text-indigo-100 uppercase tracking-widest">Day</span>
               <input 
-                type="number" min="1" max="31" value={selectedDate}
-                onChange={(e) => setSelectedDate(Number(e.target.value) || 1)}
-                className="bg-white/20 text-white w-10 text-center font-bold rounded-lg outline-none focus:ring-2 ring-white/30 text-sm"
+                type="number" min="1" max="31" value={day}
+                onChange={(e) => setDay(Number(e.target.value) || 1)}
+                className="bg-white/10 text-white w-12 text-center font-bold rounded-lg outline-none focus:ring-2 ring-indigo-400"
               />
             </div>
           </div>
         </div>
 
-        {/* Table Wrapper with Horizontal Scroll for Mobile */}
-        <div className="overflow-x-auto rounded-xl">
+        {/* Responsive Table */}
+        <div className="overflow-x-auto rounded-2xl">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="text-slate-500 text-[9px] sm:text-[10px] font-black uppercase border-b border-white/10">
-                <th className="p-3 sm:p-4">Life Factors</th>
-                <th className={`p-3 sm:p-4 text-center ${isMotherDominant ? 'text-pink-400 bg-pink-400/5' : ''}`}>Mother</th>
-                <th className={`p-3 sm:p-4 text-center ${!isMotherDominant ? 'text-blue-400 bg-blue-400/5' : ''}`}>Father</th>
-                <th className="p-3 sm:p-4 text-center text-white bg-white/5">Total</th>
+              <tr className="text-slate-600 text-[11px] font-bold uppercase border-b border-white/5">
+                <th className="p-5 whitespace-nowrap">Life Factors</th>
+                <th className="p-5 text-center">Mother</th>
+                <th className="p-5 text-center">Father</th>
+                <th className="p-5 text-center bg-indigo-500/10 text-indigo-300">Total</th>
+                <th className="p-5 text-center text-slate-500 tracking-wider">Minimum</th>
+                <th className="p-5 text-center text-slate-500 tracking-wider">Maximum</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
-              {factors.map((row, i) => (
-                <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="p-3 sm:p-4 font-bold italic text-xs sm:text-sm md:text-base whitespace-nowrap">
-                    <span className="mr-2 opacity-80">{row.icon}</span> {row.name}
+            <tbody className="divide-y divide-white/5 bg-black/10">
+              {displayData.map((row, i) => (
+                <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
+                  <td className="p-5 font-bold text-white text-sm sm:text-base whitespace-nowrap">
+                    <span className="mr-3 opacity-60 group-hover:opacity-100 transition-opacity">{row.icon}</span> 
+                    {row.name}
                   </td>
-                  <td className={`p-3 sm:p-4 text-center font-mono text-sm sm:text-lg transition-all duration-500 ${isMotherDominant ? 'text-pink-300 font-black' : 'text-pink-300/60'}`}>
-                    {row.mother.toFixed(2)}
+                  <td className={`p-5 text-center font-mono text-sm sm:text-base ${isMotherDominant ? 'text-pink-400 font-bold' : 'text-pink-400/40'}`}>
+                    {row.mother.toFixed(3)}
                   </td>
-                  <td className={`p-3 sm:p-4 text-center font-mono text-sm sm:text-lg transition-all duration-500 ${!isMotherDominant ? 'text-blue-300 font-black' : 'text-blue-300/60'}`}>
-                    {row.father.toFixed(2)}
+                  <td className={`p-5 text-center font-mono text-sm sm:text-base ${!isMotherDominant ? 'text-blue-400 font-bold' : 'text-blue-400/40'}`}>
+                    {row.father.toFixed(3)}
                   </td>
-                  <td className="p-3 sm:p-4 text-center font-mono font-black text-white bg-indigo-500/5">
-                    {row.total.toFixed(2)}
+                  {/* Highlighted Total Column */}
+                  <td className="p-5 text-center font-mono font-black text-white bg-indigo-500/10 text-lg sm:text-xl">
+                    {row.total.toFixed(3)}
+                  </td>
+                  {/* Increased Size for Min/Max Range */}
+                  <td className="p-5 text-center font-mono text-slate-500 text-sm italic">
+                    {row.min.toFixed(3)}
+                  </td>
+                  <td className="p-5 text-center font-mono text-slate-500 text-sm italic">
+                    {row.max.toFixed(3)}
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="bg-indigo-900/40 text-white font-black border-t-2 border-indigo-500/30">
-                <td className="p-4 sm:p-6 text-sm sm:text-lg">TOTAL</td>
-                <td className="p-4 sm:p-6 text-center text-pink-500 text-sm sm:text-xl">{mTotal.toFixed(2)}</td>
-                <td className="p-4 sm:p-6 text-center text-blue-500 text-sm sm:text-xl">{fTotal.toFixed(2)}</td>
-                <td className="p-4 sm:p-6 text-center bg-indigo-600 text-xl sm:text-3xl shadow-inner">
-                  {(mTotal + fTotal).toFixed(0)}
+              <tr className="bg-indigo-600/30 text-white font-black border-t-2 border-indigo-500/50">
+                <td className="p-6 sm:p-10 text-base sm:text-xl tracking-tighter">TOTAL BIOMETRIC SUM</td>
+                <td className="p-6 sm:p-10 text-center text-pink-500 text-lg sm:text-2xl">{totals.m.toFixed(3)}</td>
+                <td className="p-6 sm:p-10 text-center text-blue-500 text-lg sm:text-2xl">{totals.f.toFixed(3)}</td>
+                <td className="p-6 sm:p-10 text-center bg-indigo-600 text-3xl sm:text-5xl font-black shadow-[inset_0_4px_20px_rgba(0,0,0,0.4)]">
+                  {Math.round(totals.t)}
                 </td>
+                <td colSpan="2" className="p-6 sm:p-10"></td>
               </tr>
             </tfoot>
           </table>
         </div>
-        <p className="text-center text-[8px] text-slate-600 mt-6 tracking-widest uppercase italic">Optimized for All Devices</p>
       </div>
     </div>
   );
