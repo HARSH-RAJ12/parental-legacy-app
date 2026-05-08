@@ -9,13 +9,13 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000; 
 
-// Middleware
+// 1. Middleware
 app.use(cors());
 
-// Static Files
+// 2. Static Files Serving (Frontend files locate karne ke liye)
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Factor Data
+// 3. Factor Data Setup
 const factorsData = [
   { name: 'Genetic Inheritance', min: 9.333, max: 10.777, icon: '🧬' },
   { name: 'Constitutional Vitality', min: 8.111, max: 9.111, icon: '⚡' },
@@ -31,7 +31,7 @@ const getSeededRandom = (seed) => {
   return x - Math.floor(x);
 };
 
-// API Endpoint
+// 4. API Endpoint (Aapka Algorithm)
 app.get('/api/parental-legacy', (req, res) => {
   const day = parseInt(req.query.day) || new Date().getDate();
   const isOdd = day % 2 !== 0;
@@ -92,12 +92,17 @@ app.get('/api/parental-legacy', (req, res) => {
   });
 });
 
-// Catch-all route
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+// 5. THE FIX: Catch-all route for UI
+// Render par wildcard '*' kabhi crash karta hai, isliye hum isse simple tarike se likh rahe hain
+app.get('/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'), (err) => {
+    if (err) {
+      res.status(500).send(err);
+    }
+  });
 });
 
-// Server Start
+// 6. Server Start
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
