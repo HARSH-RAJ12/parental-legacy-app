@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 
-
+// Static Files
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Factor Data
@@ -92,7 +92,7 @@ app.get('/api/parental-legacy', (req, res) => {
   });
 });
 
-//Catch-all route
+// Catch-all route
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
