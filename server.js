@@ -1,11 +1,19 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path'; 
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000; 
 
 // Middleware
 app.use(cors());
+
+
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // Factor Data
 const factorsData = [
@@ -29,7 +37,6 @@ app.get('/api/parental-legacy', (req, res) => {
   const isOdd = day % 2 !== 0;
   const seed = day * 555;
 
-  // 1. Generate base values
   let baseRows = factorsData.map((f, idx) => {
     const r1 = getSeededRandom(seed + idx);
     const r2 = getSeededRandom(seed + idx + 100);
@@ -49,7 +56,6 @@ app.get('/api/parental-legacy', (req, res) => {
     return { ...f, mother, father };
   });
 
-  // 2. Normalization
   const currentGrandTotal = baseRows.reduce((acc, r) => acc + r.mother + r.father, 0);
   const multiplier = 100 / currentGrandTotal;
 
@@ -59,7 +65,6 @@ app.get('/api/parental-legacy', (req, res) => {
     return { ...r, mother: m, father: f };
   });
 
-  // 3. Precision Fix for exact 100.000
   let totalAfterScale = scaledRows.reduce((acc, r) => acc + Number(r.mother.toFixed(3)) + Number(r.father.toFixed(3)), 0);
   let diff = Math.round((100 - totalAfterScale) * 1000);
 
@@ -75,7 +80,6 @@ app.get('/api/parental-legacy', (req, res) => {
     i++;
   }
 
-  // Final
   res.json({
     day,
     isMotherDominant: isOdd,
@@ -88,8 +92,12 @@ app.get('/api/parental-legacy', (req, res) => {
   });
 });
 
+//Catch-all route
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
 // Server Start
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🔗 API Test link: http://localhost:${PORT}/api/parental-legacy?day=15`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
